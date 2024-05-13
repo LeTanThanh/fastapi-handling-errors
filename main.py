@@ -2,14 +2,16 @@ from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Path
 from fastapi import Request
-from fastapi.responses import JSONResponse
 from fastapi import status
+from fastapi.responses import JSONResponse
+from fastapi.responses import PlainTextResponse
+from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 
 from typing import Annotated
 
 from exceptions.uniconrn_exception import UnicornException
 
-app = FastAPI()
+app = FastAPI(debug = True)
 
 ITEMS = { "foo": "The Foo Wrestlers" }
 
@@ -24,6 +26,7 @@ async def read_item(id: Annotated[str, Path()]):
 """
 
 # Add custom headers
+"""
 @app.get("/items/{id}")
 async def read_item(id: Annotated[str, Path()]):
   if id not in ITEMS:
@@ -34,6 +37,7 @@ async def read_item(id: Annotated[str, Path()]):
     )
 
   return { "item": ITEMS[id] }
+"""
 
 # Install custom exception handlers
 @app.exception_handler(UnicornException)
@@ -51,3 +55,22 @@ async def read_unicorns(name: Annotated[str, Path()]):
     raise UnicornException(name = name)
 
   return {"name": name}
+
+# Override the default exception handlers
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(request: Request, exception: RequestValidationError):
+  return PlainTextResponse(str(exception), status_code = status.HTTP_400_BAD_REQUEST)
+
+@app.exception_handler(StarletteHTTPException)
+async def starlette_http_Exception_handler(request: Request, exception: StarletteHTTPException):
+  return PlainTextResponse(str(exception.detail), status_code = exception.status_code)
+
+@app.get("/items/{id}")
+async def read_item(id: Annotated[int, Path()]):
+  if id == 3:
+    raise HTTPException(
+      status_code = status.HTTP_418_IM_A_TEAPOT,
+      detail = "Nope! I don't liek 3."
+    )
+
+  return {"id": id}
